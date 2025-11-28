@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>車内環境監視</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+    <style>
+        html, body {
+            height: 100%; 
+            margin: 0;
+            padding: 0;
+            font-family: "Inter", sans-serif;
+        }
+
+        .main-container {
+            height: calc(100vh - 68px);
+            width: 100%;
+            overflow: hidden; 
+        }
+        
+        #map {
+            width: 50%;
+            height: 100%; 
+            flex-shrink: 0;
+            margin-right : 10px;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        
+        .data-area {
+            flex-grow: 1; 
+            overflow-y: auto; 
+            padding-right: 1rem;
+        }
+
+        .alarm-on {
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 15px rgba(239, 68, 68, 0);
+            }
+        }
+
+        .custom-marker {
+            
+        }
+
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <header class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
+        <h1 class="text-2xl font-bold text-indigo-700">車内環境監視システム</h1>
+        <div class="flex items-center space-x-4">
+            <p id="status" class="text-sm font-medium text-gray-600">データを読み込み中...</p>
+            
+            <button id="subscribeButton" class="px-4 py-2 rounded-lg text-white font-semibold transition duration-150 ease-in-out bg-teal-500 hover:bg-teal-600 shadow-lg">
+                通知を許可する
+            </button>
+            
+            <button id="alarmButton" class="px-6 py-2 rounded-lg text-white font-semibold transition duration-150 ease-in-out bg-red-600 hover:bg-red-700 shadow-lg">
+                <span id="alarmText">警告ブザーを鳴らす</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="main-container flex p-4">
+
+        <div id="map" class="h-full">
+            </div>
+
+        <div class="data-area space-y-6 pb-4">
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                <div id="co2StatusCard" class="bg-white p-5 rounded-xl shadow-lg border-l-4 border-green-500 transition duration-150">
+                    <div class="flex justify-between items-center">
+                        <div class="text-sm font-medium text-gray-500">現在のCO2濃度</div>
+                        <div id="co2Icon" class="text-green-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div id="currentCo2" class="text-3xl font-extrabold text-gray-900 mt-1">--- ppm</div>
+                    <p id="co2Comment" class="text-sm font-semibold text-green-500 mt-2">換気は十分です。</p>
+                    </div>
+                
+                <div class="bg-white p-5 rounded-xl shadow-lg border-l-4 border-indigo-500">
+                    <div class="flex justify-between items-center">
+                        <div class="text-sm font-medium text-gray-500">現在の温度</div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                    </div>
+                    <div id="currentTemp" class="text-3xl font-extrabold text-gray-900 mt-1">--- °C</div>
+                    <p class="text-sm font-medium text-gray-500 mt-2">快適温度の目安: 25-28°C</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl shadow-lg border-l-4 border-cyan-500">
+                    <div class="flex justify-between items-center">
+                        <div class="text-sm font-medium text-gray-500">現在の湿度</div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14 10h.01M21 12a9 9 0 01-9 9m9-9A9 9 0 003 12m9 9a9 9 0 01-9-9m9 9v-2m-9-9H3m18 0h-3m0 0h-3m0 0H9m0 0V3m6 6v3m0 0v3m0 0v3m0 0v3m0-12v-3" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </div>
+                    <div id="currentHumid" class="text-3xl font-extrabold text-gray-900 mt-1">--- %</div>
+                    <p class="text-sm font-medium text-gray-500 mt-2">快適湿度の目安: 40-60%</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6">
+                
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">CO2濃度推移と予測</h2>
+                    <div class="relative h-96"> <canvas id="co2Chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">温度・湿度推移</h2>
+                    <div class="relative h-64">
+                        <canvas id="humidChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-lg">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">最新データ履歴 (最大20件)</h2>
+                <div class="overflow-x-auto">
+                    <table id="dataTable" class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">時刻</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">緯度</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">経度</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CO2 (ppm)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">温度 (°C)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">湿度 (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script src="map.js"></script>
+    <script src="get.js"></script>
+
+    <script>
+        let isAlarmOn = false;
+
+        function updateAlarmButtonUI(isWarning) {
+            const button = document.getElementById('alarmButton');
+            const text = document.getElementById('alarmText');
+
+            button.classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-gray-500', 'hover:bg-gray-600', 'alarm-on');
+
+            if (isWarning) {
+                button.classList.add('bg-red-600', 'hover:bg-red-700', 'alarm-on');
+                text.textContent = '警告ブザーを停止する';
+            } else {
+                button.classList.add('bg-red-600', 'hover:bg-red-700'); 
+                text.textContent = '警告ブザーを鳴らす';
+            }
+        }
+
+        async function sendAlarmRequest(action) {
+            const gasUrl = GAS_URL; 
+            console.log("押された");
+
+            const url = `${gasUrl}?function=${action}`;
+
+            try {
+                const response = await fetch(url);
+                const text = await response.text();
+                
+                if (response.ok) {
+                    console.log(`GAS [${action}] 実行成功:`, text);
+                    return true;
+                } else {
+                    console.error(`GAS [${action}] 実行失敗 (HTTPエラー):`, text);
+                    return false;
+                }
+            } catch (error) {
+                console.error(`GAS [${action}] 実行失敗 (Fetchエラー):`, error);
+                return false;
+            }
+        }
+
+        document.getElementById('alarmButton').addEventListener('click', async () => {
+            let success = false;
+            
+            if (!isAlarmOn) {
+                success = await sendAlarmRequest('setAlarmFlag');
+            } else {
+                success = await sendAlarmRequest('resetAlarmFlag');
+            }
+            
+            if (success) {
+                isAlarmOn = !isAlarmOn;
+                updateAlarmButtonUI(isAlarmOn);
+                
+                if (isAlarmOn) {
+                    console.log("警告ブザーを鳴らします。");
+                } else {
+                    console.log("警告ブザーを停止しました。");
+                }
+            } else {
+                console.warn("GAS操作に失敗したため、ボタンの状態は変更されませんでした。");
+            }
+        });
+
+        //プッシュ通知
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/\-/g, '+')
+                .replace(/_/g, '/');
+
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        async function subscribeUser() {
+            const subscribeButton = document.getElementById('subscribeButton');
+            subscribeButton.disabled = true;
+            subscribeButton.textContent = '購読中...';
+
+            if ('serviceWorker' in navigator && 'PushManager' in window) {
+                try {
+                    //Service Worker
+                    const registration = await navigator.serviceWorker.register('sw.js');
+                    console.log('Service Worker 登録成功:', registration);
+
+                    const VAPID_PUBLIC_KEY = 'BLy5LQkDe6XwaUvqqA-EywANsjQZkmPnXaeZETtlpVmq_4i6ZtLIKhEBc55KN-CPjjwRYelPBk89oyuCdcyR1WE';
+                    
+                    if (VAPID_PUBLIC_KEY === 'YOUR_VAPID_PUBLIC_KEY_HERE') {
+                        console.warn("VAPID公開鍵が設定されていません。Push通知購読をスキップします。");
+                        subscribeButton.textContent = '通知設定スキップ (鍵なし)';
+                        subscribeButton.classList.remove('bg-teal-500', 'hover:bg-teal-600');
+                        subscribeButton.classList.add('bg-orange-500');
+                        return;
+                    }
+
+                    const subscribeOptions = {
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                    };
+
+                    const subscription = await registration.pushManager.subscribe(subscribeOptions);
+                    console.log('Push Manager 購読成功:', subscription);
+                    await fetch('/subscribe', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(subscription),
+                    });
+                    
+                    console.log('Subscription情報をサーバーに保存しました。');
+                    
+                    subscribeButton.textContent = '通知設定完了';
+                    subscribeButton.classList.remove('bg-teal-500', 'hover:bg-teal-600');
+                    subscribeButton.classList.add('bg-green-500', 'shadow-none');
+                    subscribeButton.disabled = true;
+
+
+                } catch (error) {
+                    console.error('Push通知の購読に失敗:', error);
+                    subscribeButton.textContent = '通知設定失敗';
+                    subscribeButton.classList.remove('bg-teal-500', 'hover:bg-teal-600');
+                    subscribeButton.classList.add('bg-red-500');
+                    subscribeButton.disabled = false;
+                }
+            } else {
+                console.warn('このブラウザはService Worker または Push API をサポートしていません。');
+                subscribeButton.textContent = '通知非対応ブラウザ';
+                subscribeButton.classList.remove('bg-teal-500', 'hover:bg-teal-600');
+                subscribeButton.classList.add('bg-gray-500');
+            }
+        }
+        document.getElementById('subscribeButton').addEventListener('click', subscribeUser);
+    </script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+# Node.js
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Optional npm cache directory
+.npm/
+
+# Optional eslint cache
+.eslintcache
+
+# dotenv environment variables file
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Runtime files
+*.pid
+*.seed
+*.pid.lock
+
+# Directory for compiled output
+dist/
+build/
+out/
+es/
+lib/
+tmp/
+
+# Coverage directory
+coverage/
+
+# Test results
+junit.xml
+mocha.xml
+cypress/videos/
+cypress/screenshots/
+
+# Editor/OS specific files
+.DS_Store
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+Thumbs.db
+
+# Misc
+.cache/
+.project
+.settings/
+.classpath
+.factorypath
+.metadata

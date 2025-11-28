@@ -1,0 +1,21 @@
+{
+  "name": "車内環境リアルタイム監視",
+  "short_name": "車内監視",
+  "description": "車内のCO2、温度、湿度をリアルタイムで監視し、危険な状態を通知します。",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4a90e2",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
